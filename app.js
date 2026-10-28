@@ -65,24 +65,48 @@ const T = () => TURNOS[turno];
 /* ---------- motor das substituições ---------- */
 function acepatsNoDia(p, d) { return T().H[p][d].filter(v => v === "Acepat").length; }
 
-function candidatos(d, s, turma) {
-  const livres = [];
-  for (const p of T().profs) {
-    if (ausentes.has(p)) continue;
-    const cel = T().H[p][d][s];
-    if (cel === "subst") livres.push({ nome: p, tipo: "subst" });
-    else if (cel === "Acepat" && acepatsNoDia(p, d) === 1) livres.push({ nome: p, tipo: "remanejar" });
-  }
-  const daAula = p => T().H[p].some(linha => linha.includes(turma));
-  return livres.sort((a, b) =>
-    (a.tipo === b.tipo ? 0 : a.tipo === "subst" ? -1 : 1) ||
-    (daAula(b.nome) - daAula(a.nome)) ||
-    a.nome.localeCompare(b.nome, "pt-BR"));
-}
-
 function montar() {
   const plano = [];
   const carga = {};
+  const preso = {};                                     // professor -> horários já comprometidos no dia
+  const marcar = (p, s) => { (preso[p] = preso[p] || new Set()).add(s); };
+  const ocupado = (p, s) => !!(preso[p] && preso[p].has(s));
+
+  // Horários do mesmo dia em que o professor pode receber o Acepat remanejado:
+  // só vale um horário de plantão subst livre, no próprio dia. Nunca em outro dia.
+  function destinosDoAcepat(p, s) {
+    const d = [];
+    for (let i = 0; i < T().nHor; i++)
+      if (i !== s && T().H[p][dia][i] === "subst" && !ocupado(p, i)) d.push(i);
+    return d;
+  }
+
+  function candidatos(s, turma) {
+    const livres = [];
+    for (const p of T().profs) {
+      if (ausentes.has(p) || ocupado(p, s)) continue;
+      const cel = T().H[p][dia][s];
+      if (cel === "subst") {
+        livres.push({ nome: p, tipo: "subst" });
+      } else if (cel === "Acepat" && acepatsNoDia(p, dia) === 1) {
+        const destinos = destinosDoAcepat(p, s);
+        if (destinos.length) livres.push({ nome: p, tipo: "remanejar", destino: destinos[destinos.length - 1] });
+      }
+    }
+    const daAula = p => T().H[p].some(linha => linha.includes(turma));
+    return livres.sort((a, b) =>
+      (a.tipo === b.tipo ? 0 : a.tipo === "subst" ? -1 : 1) ||
+      (daAula(b.nome) - daAula(a.nome)) ||
+      a.nome.localeCompare(b.nome, "pt-BR"));
+  }
+
+  function reservar(a, o) {
+    a.sub = o.nome; a.tipo = o.tipo;
+    marcar(o.nome, plano.length);
+    if (o.tipo === "remanejar") { a.destino = o.destino; marcar(o.nome, o.destino); }
+    carga[o.nome] = (carga[o.nome] || 0) + 1;
+  }
+
   for (let s = 0; s < T().nHor; s++) {
     const aulas = [];
     for (const p of ausentes) {
@@ -90,27 +114,22 @@ function montar() {
       if (T().turma.test(cel)) aulas.push({ turma: cel, ausente: p });
     }
     aulas.sort((a, b) => a.turma.localeCompare(b.turma));
-    const usados = new Set();
     for (const a of aulas) {
-      a.opcoes = candidatos(dia, s, a.turma);
+      a.opcoes = candidatos(s, a.turma);
       const chave = turno + "|" + s + "|" + a.turma + "|" + a.ausente;
       const guardada = escolhas[chave];
+      const escolhida = guardada && a.opcoes.find(o => o.nome === guardada);
       if (guardada === T().coord) { a.sub = T().coord; a.tipo = "coord"; }
-      else if (guardada && a.opcoes.some(o => o.nome === guardada) && !usados.has(guardada)) {
-        a.sub = guardada;
-        a.tipo = a.opcoes.find(o => o.nome === guardada).tipo;
-        usados.add(guardada);
-      } else {
-        const livres = a.opcoes.filter(o => !usados.has(o.nome));
+      else if (escolhida) { reservar(a, escolhida); }
+      else {
         let melhor = null;
-        for (const o of livres) {
+        for (const o of a.opcoes) {
           if (!melhor) { melhor = o; continue; }
           if (o.tipo === melhor.tipo && (carga[o.nome] || 0) < (carga[melhor.nome] || 0)) melhor = o;
         }
-        if (melhor) { a.sub = melhor.nome; a.tipo = melhor.tipo; usados.add(melhor.nome); }
+        if (melhor) reservar(a, melhor);
         else { a.sub = T().coord; a.tipo = "coord"; }
       }
-      if (a.sub !== T().coord) carga[a.sub] = (carga[a.sub] || 0) + 1;
       a.chave = chave;
     }
     plano.push(aulas);
@@ -208,7 +227,7 @@ function render() {
       q.querySelector("b").textContent = a.ausente;
       const tag = document.createElement("span");
       tag.className = "tag" + (a.tipo === "subst" ? "" : " rem");
-      tag.textContent = a.tipo === "remanejar" ? "Acepat remanejado"
+      tag.textContent = a.tipo === "remanejar" ? "Acepat vai para o " + T().hor[a.destino]
         : a.tipo === "coord" ? "sem plantão livre" : "plantão subst";
       q.appendChild(tag);
 
@@ -219,7 +238,8 @@ function render() {
       a.opcoes.forEach(o => {
         const op = document.createElement("option");
         op.value = o.nome;
-        op.textContent = o.nome + (o.tipo === "remanejar" ? "  (remanejar Acepat)" : "  (subst)");
+        op.textContent = o.nome + (o.tipo === "remanejar"
+          ? "  (Acepat vai para o " + T().hor[o.destino] + ")" : "  (subst)");
         sel.appendChild(op);
       });
       const op = document.createElement("option");
@@ -257,7 +277,7 @@ function textoWpp(plano) {
     if (!aulas.length) return;
     linhas.push(T().hor[s]);
     aulas.forEach(a => {
-      const extra = a.tipo === "remanejar" ? " (remanejar o Acepat no dia)" : "";
+      const extra = a.tipo === "remanejar" ? " (Acepat passa para o " + T().hor[a.destino] + ")" : "";
       linhas.push("- " + a.turma + ": " + a.sub + extra + "  [no lugar de " + a.ausente + "]");
     });
     linhas.push("");
