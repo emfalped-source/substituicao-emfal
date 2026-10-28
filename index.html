@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Substituição EMFAL</title>
+<meta name="description" content="Quadro de substituição de professores da Escola Municipal Francisca Alves">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1f4d3c">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Substituição">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#f4f6f4; --surface:#ffffff; --ink:#1b2420; --muted:#5d6b64; --line:#d7ded9;
+  --accent:#1f4d3c; --accent-soft:#e3ece7; --alert:#9c4414; --alert-soft:#f6e8df;
+  --display:"Bitter",Georgia,serif; --body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  color-scheme:light;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141917;--surface:#1d2421;--ink:#e8eeea;--muted:#9aa8a1;--line:#303a35;
+  --accent:#8fcdb0;--accent-soft:#223029;--alert:#e6a173;--alert-soft:#33241b;color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#141917;--surface:#1d2421;--ink:#e8eeea;--muted:#9aa8a1;--line:#303a35;
+  --accent:#8fcdb0;--accent-soft:#223029;--alert:#e6a173;--alert-soft:#33241b;color-scheme:dark;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;
+  font-variant-numeric:tabular-nums;-webkit-text-size-adjust:100%}
+img{max-width:100%}
+[hidden]{display:none!important}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--accent)}
+.wrap{max-width:860px;margin:0 auto;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:0 48px}
+header.bar{background:var(--accent);color:#fff;margin:0 calc(-1*max(16px,env(safe-area-inset-left,0px))) 20px;
+  padding-block:18px 16px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.bar h1{font-family:var(--display);font-size:1.45rem;margin:0;line-height:1.2;text-wrap:balance}
+header.bar p{margin:4px 0 0;opacity:.82;font-size:.86rem}
+h2{font-family:var(--display);font-size:1.02rem;margin:0 0 10px}
+.step{font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px}
+section{margin-bottom:26px}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+button,select{font-family:var(--body);font-size:.92rem;color:inherit}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;cursor:pointer;
+  transition:background .12s,border-color .12s}
+.chip[aria-pressed="true"]{background:var(--alert-soft);border-color:var(--alert);font-weight:600}
+.chip:focus-visible,select:focus-visible,.btn:focus-visible,.day:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.day{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 14px;cursor:pointer}
+.day[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:8px;padding:9px 16px;
+  cursor:pointer;font-weight:600;font-size:.9rem}
+.btn.ghost{background:transparent;color:var(--accent)}
+.slot{background:var(--surface);border:1px solid var(--line);border-radius:10px;margin-bottom:12px;overflow:hidden}
+.slot>h3{margin:0;padding:10px 14px;background:var(--accent-soft);font-family:var(--display);font-size:.95rem;
+  border-bottom:1px solid var(--line)}
+.aula{display:grid;grid-template-columns:62px 1fr 1fr;gap:10px;align-items:center;padding:11px 14px;
+  border-bottom:1px solid var(--line)}
+.aula:last-child{border-bottom:none}
+.turma{font-weight:700;font-family:var(--display);font-size:1.02rem}
+.quem{font-size:.86rem;color:var(--muted);min-width:0}
+.quem b{color:var(--ink);font-weight:600;display:block;font-size:.95rem}
+select{width:100%;min-width:0;padding:8px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface)}
+select.vazio{border-color:var(--alert);background:var(--alert-soft)}
+.tag{display:inline-block;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;
+  border-radius:4px;background:var(--accent-soft);color:var(--accent);font-weight:600;margin-top:3px}
+.tag.rem{background:var(--alert-soft);color:var(--alert)}
+.aviso{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--alert);border-radius:8px;
+  padding:12px 14px;font-size:.88rem;color:var(--muted);margin-bottom:12px}
+textarea{width:100%;min-height:190px;font-family:ui-monospace,Menlo,monospace;font-size:.84rem;padding:12px;
+  border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);resize:vertical}
+details{margin-top:8px}
+summary{cursor:pointer;color:var(--accent);font-size:.86rem;font-weight:600}
+.gradeBox{overflow-x:auto;margin-top:10px}
+table{border-collapse:collapse;font-size:.78rem;min-width:420px}
+th,td{border:1px solid var(--line);padding:5px 8px;text-align:center;white-space:nowrap}
+th{background:var(--accent-soft);font-weight:600}
+td.nome{text-align:left;font-weight:600}
+td.sub{background:var(--accent-soft);color:var(--accent);font-weight:600}
+td.ace{color:var(--muted)}
+td.fora{background:var(--alert-soft);color:var(--alert);font-weight:600}
+.legenda{font-size:.8rem;color:var(--muted);margin-top:8px}
+@media (max-width:520px){
+  .aula{grid-template-columns:52px 1fr;grid-template-areas:"t q" "s s";row-gap:8px}
+  .aula .turma{grid-area:t}.aula .quem{grid-area:q}.aula .escolha{grid-area:s}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="bar">
+    <h1>Quadro de Substituição</h1>
+    <p>Escola Municipal Francisca Alves</p>
+  </header>
+
+  <section>
+    <span class="step">Passo 1</span>
+    <h2>Turno e dia</h2>
+    <div class="row" id="turnos" style="margin-bottom:8px"></div>
+    <div class="row" id="dias"></div>
+  </section>
+
+  <section>
+    <span class="step">Passo 2</span>
+    <h2>Professores que faltaram</h2>
+    <div class="row" id="profs"></div>
+  </section>
+
+  <section>
+    <span class="step">Passo 3</span>
+    <h2>Substituições do dia</h2>
+    <div id="saida"></div>
+    <details>
+      <summary>Ver a grade completa do dia</summary>
+      <div class="gradeBox"><table id="grade"></table></div>
+      <p class="legenda">subst = plantão de substituição · Acepat = módulo Acepat · Red = redução</p>
+    </details>
+  </section>
+
+  <section id="wppBox" hidden>
+    <h2>Mensagem para o grupo</h2>
+    <textarea id="wpp" readonly></textarea>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="copiar">Copiar mensagem</button>
+      <button class="btn ghost" id="limpar">Limpar seleção</button>
+    </div>
+  </section>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
