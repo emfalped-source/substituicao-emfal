@@ -1,4 +1,4 @@
-const CACHE = "subst-emfal-v4";
+const CACHE = "subst-emfal-v5";
 const ARQUIVOS = ["./", "./index.html", "./app.js", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {

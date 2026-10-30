@@ -65,6 +65,21 @@ const diaTodo = p => ausentes.has(p) && ausentes.get(p).size === T().nHor;
 let escolhas = {};
 const T = () => TURNOS[turno];
 
+/* ---------- data do registro ---------- */
+const pad = n => String(n).padStart(2, "0");
+const isoDe = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+const deIso = s => { const [a, m, d] = s.split("-").map(Number); return new Date(a, m - 1, d); };
+const brDe = s => s.split("-").reverse().join("/");
+function segundaDe(d) {
+  const r = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const w = r.getDay();
+  r.setDate(r.getDate() - ((w + 6) % 7) + (w === 0 || w === 6 ? 7 : 0));
+  return r;
+}
+let dataSel = (() => { const s = segundaDe(new Date()); s.setDate(s.getDate() + dia); return isoDe(s); })();
+function dataDoDia(i) { const s = segundaDe(deIso(dataSel)); s.setDate(s.getDate() + i); return isoDe(s); }
+let ultimoPlano = null;
+
 /* ---------- motor das substituições ---------- */
 function acepatsNoDia(p, d) { return T().H[p][d].filter(v => v === "Acepat").length; }
 
@@ -159,7 +174,7 @@ DIAS.forEach((d, i) => {
   const b = document.createElement("button");
   b.className = "day"; b.type = "button"; b.textContent = d.replace("-feira", "");
   b.id = "dia" + i;
-  b.onclick = () => { dia = i; escolhas = {}; render(); };
+  b.onclick = () => { dia = i; dataSel = dataDoDia(i); escolhas = {}; render(); };
   elDias.appendChild(b);
 });
 
@@ -188,6 +203,8 @@ function render() {
     if (el) el.setAttribute("aria-pressed", ausentes.has(p));
   });
   painelFaltas();
+  document.getElementById("dataReg").value = dataSel;
+  ultimoPlano = null;
 
   elSaida.innerHTML = "";
   const diaTodoAcepat = [...ausentes.keys()].filter(p => diaTodo(p) && acepatsNoDia(p, dia) === T().nHor);
@@ -200,6 +217,7 @@ function render() {
   }
 
   const plano = montar();
+  ultimoPlano = plano;
   let total = 0, semSub = 0;
 
   if (diaTodoAcepat.length) {
@@ -385,6 +403,203 @@ function painelFaltas() {
 }
 
 document.getElementById("limpar").onclick = () => { ausentes.clear(); escolhas = {}; render(); };
+
+/* ---------- histórico do dia (fica salvo neste aparelho) ---------- */
+const CHAVE_HIST = "subst-emfal-historico";
+let filtroHist = "pend";
+const abertos = new Set();
+
+function lerHist() {
+  try { return JSON.parse(localStorage.getItem(CHAVE_HIST)) || []; } catch (e) { return []; }
+}
+function gravarHist(lista) {
+  try { localStorage.setItem(CHAVE_HIST, JSON.stringify(lista)); return true; } catch (e) { return false; }
+}
+const idReg = r => r.data + "|" + r.turno;
+const nomeDia = iso => DIAS[(deIso(iso).getDay() + 6) % 7] || "";
+
+function montarRegistro() {
+  const subs = [];
+  ultimoPlano.forEach((aulas, s) => aulas.forEach(a => subs.push({
+    hor: s + 1, turma: a.turma, ausente: a.ausente, sub: a.sub, tipo: a.tipo,
+    destino: a.tipo === "remanejar" ? a.destino + 1 : null
+  })));
+  return {
+    data: dataSel, turno, turnoNome: T().nome, nHor: T().nHor, coord: T().coord,
+    ausentes: [...ausentes].map(([p, hs]) => ({ nome: p, hor: [...hs].sort((a, b) => a - b).map(i => i + 1) })),
+    subs, lancado: false, salvoEm: new Date().toISOString()
+  };
+}
+
+const listaHor = hs => hs.length === 1 ? hs[0] + "º horário"
+  : hs.slice(0, -1).map(h => h + "º").join(", ") + " e " + hs[hs.length - 1] + "º horários";
+
+function resumoPonto(r) {
+  const L = ["*PONTO - " + brDe(r.data) + " (" + nomeDia(r.data).toLowerCase() + ") - " + r.turnoNome.toUpperCase() + "*", "", "Faltas:"];
+  r.ausentes.forEach(a => {
+    const aulas = r.subs.filter(s => s.ausente === a.nome).length;
+    L.push("- " + a.nome + ": " + (a.hor.length === r.nHor ? "dia todo" : listaHor(a.hor)) +
+      " (" + (aulas ? aulas + (aulas === 1 ? " aula" : " aulas") + " a cobrir" : "sem aula a cobrir") + ")");
+  });
+  const porSub = new Map();
+  r.subs.filter(s => s.tipo !== "coord").forEach(s => {
+    if (!porSub.has(s.sub)) porSub.set(s.sub, []);
+    porSub.get(s.sub).push(s);
+  });
+  L.push("", "Substituições realizadas:");
+  if (!porSub.size) L.push("- nenhuma");
+  [...porSub.keys()].sort((a, b) => a.localeCompare(b, "pt-BR")).forEach(p => {
+    const it = porSub.get(p).sort((a, b) => a.hor - b.hor);
+    L.push("- " + p + ": " + it.length + (it.length === 1 ? " aula" : " aulas") + " — " +
+      it.map(s => s.hor + "º " + s.turma + " (no lugar de " + s.ausente + ")" +
+        (s.tipo === "remanejar" ? " [Acepat passou para o " + s.destino + "º]" : "")).join("; "));
+  });
+  const co = r.subs.filter(s => s.tipo === "coord").sort((a, b) => a.hor - b.hor);
+  if (co.length) {
+    L.push("", "Coordenação em sala:");
+    L.push("- " + co.length + (co.length === 1 ? " aula" : " aulas") + " — " +
+      co.map(s => s.hor + "º " + s.turma + " (no lugar de " + s.ausente + ")").join("; "));
+  }
+  return L.join("\n");
+}
+
+function aviso(btn, txt, volta) {
+  const orig = volta || btn.textContent;
+  btn.textContent = txt;
+  setTimeout(() => btn.textContent = orig, 1700);
+}
+
+async function copiarTexto(txt, btn) {
+  try { await navigator.clipboard.writeText(txt); aviso(btn, "Copiado"); }
+  catch (e) { window.prompt("Copie o texto:", txt); }
+}
+
+document.getElementById("dataReg").onchange = e => {
+  const v = e.target.value;
+  if (!v) return;
+  const w = deIso(v).getDay();
+  if (w === 0 || w === 6) {
+    alert("Essa data cai no fim de semana. Escolha um dia de segunda a sexta.");
+    e.target.value = dataSel;
+    return;
+  }
+  dataSel = v; dia = w - 1; escolhas = {}; render();
+};
+
+document.getElementById("salvarHist").onclick = () => {
+  const btn = document.getElementById("salvarHist");
+  if (!ultimoPlano || !ausentes.size) { alert("Marque quem faltou antes de salvar."); return; }
+  const r = montarRegistro();
+  const lista = lerHist();
+  const i = lista.findIndex(x => idReg(x) === idReg(r));
+  if (i >= 0) {
+    if (!confirm("Já existe um registro de " + brDe(r.data) + " (" + r.turnoNome + "). Substituir pelo quadro atual?")) return;
+    r.lancado = lista[i].lancado;
+    lista[i] = r;
+  } else lista.push(r);
+  if (!gravarHist(lista)) { alert("Não foi possível salvar neste aparelho (armazenamento bloqueado)."); return; }
+  if (!r.lancado) filtroHist = "pend";
+  abertos.add(idReg(r));
+  renderHist();
+  aviso(btn, "Salvo no histórico");
+  document.getElementById("histBox").scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+document.querySelectorAll("#filtroHist button").forEach(b => b.onclick = () => { filtroHist = b.dataset.f; renderHist(); });
+
+function renderHist() {
+  const lista = lerHist().sort((a, b) => b.data.localeCompare(a.data) || a.turno.localeCompare(b.turno));
+  const pend = lista.filter(r => !r.lancado).length;
+  document.getElementById("contPend").textContent = pend ? pend + (pend === 1 ? " pendente" : " pendentes") : "nada pendente";
+  document.querySelectorAll("#filtroHist button").forEach(b => b.setAttribute("aria-pressed", b.dataset.f === filtroHist));
+  const vis = filtroHist === "pend" ? lista.filter(r => !r.lancado) : lista;
+  const el = document.getElementById("hist");
+  el.innerHTML = "";
+  document.getElementById("exportar").disabled = !lista.length;
+
+  if (!vis.length) {
+    el.innerHTML = '<div class="aviso">' + (lista.length
+      ? "Tudo lançado no ponto. Toque em <b>Todos</b> para ver os registros anteriores."
+      : "Nenhum dia salvo ainda. Depois de montar o quadro, toque em <b>Salvar no histórico</b>.") + "</div>";
+    return;
+  }
+
+  vis.forEach(r => {
+    const id = idReg(r);
+    const card = document.createElement("div");
+    card.className = "reg" + (r.lancado ? " ok" : "");
+
+    const topo = document.createElement("button");
+    topo.type = "button"; topo.className = "regTopo";
+    topo.setAttribute("aria-expanded", abertos.has(id));
+    topo.innerHTML = '<span class="regData"></span><span class="regInfo"></span><span class="st"></span>';
+    topo.querySelector(".regData").textContent = brDe(r.data) + " · " + nomeDia(r.data).replace("-feira", "") + " · " + r.turnoNome;
+    const nSub = r.subs.length;
+    topo.querySelector(".regInfo").textContent = r.ausentes.length + (r.ausentes.length === 1 ? " falta" : " faltas") +
+      " · " + nSub + (nSub === 1 ? " aula coberta" : " aulas cobertas");
+    topo.querySelector(".st").textContent = r.lancado ? "Lançado" : "Pendente";
+    topo.onclick = () => { abertos.has(id) ? abertos.delete(id) : abertos.add(id); renderHist(); };
+    card.appendChild(topo);
+
+    if (abertos.has(id)) {
+      const corpo = document.createElement("div");
+      corpo.className = "regCorpo";
+      const pre = document.createElement("pre");
+      pre.textContent = resumoPonto(r);
+      corpo.appendChild(pre);
+
+      const acoes = document.createElement("div");
+      acoes.className = "row";
+      const bL = document.createElement("button");
+      bL.type = "button"; bL.className = "btn";
+      bL.textContent = r.lancado ? "Voltar para pendente" : "Marcar como lançado no ponto";
+      if (r.lancado) bL.classList.add("ghost");
+      bL.onclick = () => {
+        const l = lerHist(); const x = l.find(y => idReg(y) === id);
+        if (x) { x.lancado = !x.lancado; x.lancadoEm = x.lancado ? new Date().toISOString() : null; gravarHist(l); }
+        renderHist();
+      };
+      const bC = document.createElement("button");
+      bC.type = "button"; bC.className = "btn ghost"; bC.textContent = "Copiar resumo";
+      bC.onclick = () => copiarTexto(resumoPonto(r), bC);
+      const bX = document.createElement("button");
+      bX.type = "button"; bX.className = "mini perigo"; bX.textContent = "Excluir";
+      bX.onclick = () => {
+        if (!confirm("Excluir o registro de " + brDe(r.data) + " (" + r.turnoNome + ")?")) return;
+        gravarHist(lerHist().filter(y => idReg(y) !== id)); abertos.delete(id); renderHist();
+      };
+      acoes.append(bL, bC, bX);
+      corpo.appendChild(acoes);
+      if (r.lancado && r.lancadoEm) {
+        const p = document.createElement("p");
+        p.className = "legenda";
+        p.textContent = "Lançado em " + new Date(r.lancadoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+        corpo.appendChild(p);
+      }
+      card.appendChild(corpo);
+    }
+    el.appendChild(card);
+  });
+}
+
+document.getElementById("exportar").onclick = () => {
+  const lista = lerHist().sort((a, b) => a.data.localeCompare(b.data) || a.turno.localeCompare(b.turno));
+  const q = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+  const linhas = [["Data", "Dia", "Turno", "Horário", "Turma", "Professor ausente", "Substituto", "Situação", "Lançado no ponto"].map(q).join(";")];
+  lista.forEach(r => r.subs.slice().sort((a, b) => a.hor - b.hor).forEach(s => linhas.push([
+    brDe(r.data), nomeDia(r.data), r.turnoNome, s.hor + "º", s.turma, s.ausente, s.sub,
+    s.tipo === "remanejar" ? "Acepat passou para o " + s.destino + "º" : s.tipo === "coord" ? "Coordenação em sala" : "Plantão subst",
+    r.lancado ? "Sim" : "Não"
+  ].map(q).join(";"))));
+  const blob = new Blob(["﻿" + linhas.join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "historico-substituicoes-emfal.csv";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
+
+renderHist();
 
 montarChips();
 render();
