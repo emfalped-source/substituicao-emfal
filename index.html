@@ -83,6 +83,17 @@ td.nome{text-align:left;font-weight:600}
 td.sub{background:var(--accent-soft);color:var(--accent);font-weight:600}
 td.ace{color:var(--muted)}
 td.fora{background:var(--alert-soft);color:var(--alert);font-weight:600}
+#faltas{margin-top:14px;display:grid;gap:10px}
+.falta{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--alert);border-radius:10px;padding:10px 12px}
+.fnome{font-weight:600;margin-bottom:8px}
+.fnome span{display:block;font-weight:400;font-size:.78rem;color:var(--muted)}
+.hbtn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:5px 10px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;min-width:56px;line-height:1.2}
+.hbtn small{font-size:.7rem;color:var(--muted)}
+.hbtn[aria-pressed="true"]{background:var(--alert-soft);border-color:var(--alert)}
+.hbtn[aria-pressed="true"] b{color:var(--alert)}
+.atalhos{margin-top:8px;gap:6px}
+.mini{border:none;background:none;color:var(--accent);font-size:.8rem;font-weight:600;padding:2px 4px;cursor:pointer;text-decoration:underline}
 .legenda{font-size:.8rem;color:var(--muted);margin-top:8px}
 @media (max-width:520px){
   .aula{grid-template-columns:52px 1fr;grid-template-areas:"t q" "s s";row-gap:8px}
@@ -107,7 +118,9 @@ td.fora{background:var(--alert-soft);color:var(--alert);font-weight:600}
   <section>
     <span class="step">Passo 2</span>
     <h2>Professores que faltaram</h2>
+    <p class="legenda" style="margin:-4px 0 10px">Toque no nome. Se a falta for só em alguns horários, desmarque os outros logo abaixo.</p>
     <div class="row" id="profs"></div>
+    <div id="faltas" hidden></div>
   </section>
 
   <section>

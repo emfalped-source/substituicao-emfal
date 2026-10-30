@@ -10,6 +10,7 @@ Escolha o turno, o dia e marque quem faltou. O aplicativo monta o quadro horári
 - Professor em **Acepat o dia inteiro** não é usado para nada.
 - Professor com **um único Acepat no dia** aparece como segunda opção, com o módulo remanejado dentro do próprio dia.
 - Sem ninguém de plantão, a indicação é a **coordenação**.
+- A falta pode ser **só em alguns horários** (ex.: os dois primeiros ou o último). Nesse caso, só esses horários são cobertos, e o professor pode ser usado como substituto nos horários em que está na escola.
 - O mesmo professor nunca é escalado para duas turmas no mesmo horário.
 
 ## Atualizar os horários

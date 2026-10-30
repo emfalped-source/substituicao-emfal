@@ -58,7 +58,10 @@ for (const t of Object.values(TURNOS)) {
 
 let turno = "manha";
 let dia = (() => { const d = new Date().getDay(); return d >= 1 && d <= 5 ? d - 1 : 0; })();
-let ausentes = new Set();
+let ausentes = new Map();                              // professor -> Set dos horários em que falta
+const faltaEm = (p, s) => ausentes.has(p) && ausentes.get(p).has(s);
+const todos = () => new Set(Array.from({ length: T().nHor }, (_, i) => i));
+const diaTodo = p => ausentes.has(p) && ausentes.get(p).size === T().nHor;
 let escolhas = {};
 const T = () => TURNOS[turno];
 
@@ -77,14 +80,14 @@ function montar() {
   function destinosDoAcepat(p, s) {
     const d = [];
     for (let i = 0; i < T().nHor; i++)
-      if (i !== s && T().H[p][dia][i] === "subst" && !ocupado(p, i)) d.push(i);
+      if (i !== s && T().H[p][dia][i] === "subst" && !ocupado(p, i) && !faltaEm(p, i)) d.push(i);
     return d;
   }
 
   function candidatos(s, turma) {
     const livres = [];
     for (const p of T().profs) {
-      if (ausentes.has(p) || ocupado(p, s)) continue;
+      if (faltaEm(p, s) || ocupado(p, s)) continue;      // quem falta só em parte do dia pode cobrir quando está presente
       const cel = T().H[p][dia][s];
       if (cel === "subst") {
         livres.push({ nome: p, tipo: "subst" });
@@ -109,7 +112,8 @@ function montar() {
 
   for (let s = 0; s < T().nHor; s++) {
     const aulas = [];
-    for (const p of ausentes) {
+    for (const [p, hs] of ausentes) {
+      if (!hs.has(s)) continue;
       const cel = T().H[p][dia][s];
       if (T().turma.test(cel)) aulas.push({ turma: cel, ausente: p });
     }
@@ -142,6 +146,7 @@ const elTurnos = document.getElementById("turnos");
 const elDias = document.getElementById("dias");
 const elProfs = document.getElementById("profs");
 const elSaida = document.getElementById("saida");
+const elFaltas = document.getElementById("faltas");
 
 Object.entries(TURNOS).forEach(([k, t]) => {
   const b = document.createElement("button");
@@ -166,7 +171,7 @@ function montarChips() {
     const b = document.createElement("button");
     b.className = "chip"; b.type = "button"; b.textContent = p; b.id = idSeguro(p);
     b.onclick = () => {
-      ausentes.has(p) ? ausentes.delete(p) : ausentes.add(p);
+      ausentes.has(p) ? ausentes.delete(p) : ausentes.set(p, todos());
       escolhas = {}; render();
     };
     elProfs.appendChild(b);
@@ -182,9 +187,10 @@ function render() {
     const el = document.getElementById(idSeguro(p));
     if (el) el.setAttribute("aria-pressed", ausentes.has(p));
   });
+  painelFaltas();
 
   elSaida.innerHTML = "";
-  const diaTodoAcepat = [...ausentes].filter(p => acepatsNoDia(p, dia) === T().nHor);
+  const diaTodoAcepat = [...ausentes.keys()].filter(p => diaTodo(p) && acepatsNoDia(p, dia) === T().nHor);
 
   if (ausentes.size === 0) {
     elSaida.innerHTML = '<div class="aviso">Marque acima quem faltou. O quadro aparece aqui, horário por horário, só com quem está de plantão <b>subst</b> naquele horário exato.</div>';
@@ -272,7 +278,7 @@ function render() {
 
 function textoWpp(plano) {
   const linhas = ["*SUBSTITUIÇÕES - " + DIAS[dia].toUpperCase() + " - " + T().nome.toUpperCase() + "*",
-    "Ausentes: " + [...ausentes].join(", "), ""];
+    "Ausentes: " + [...ausentes.keys()].map(p => p + descFalta(p)).join(", "), ""];
   plano.forEach((aulas, s) => {
     if (!aulas.length) return;
     linhas.push(T().hor[s]);
@@ -293,7 +299,7 @@ function grade() {
     html += '<tr><td class="nome">' + p + "</td>";
     for (let s = 0; s < T().nHor; s++) {
       const v = T().H[p][dia][s];
-      const cls = ausentes.has(p) ? "fora" : v === "subst" ? "sub" : (v === "Acepat" || v === "Red") ? "ace" : "";
+      const cls = faltaEm(p, s) ? "fora" : v === "subst" ? "sub" : (v === "Acepat" || v === "Red") ? "ace" : "";
       html += '<td class="' + cls + '">' + v + "</td>";
     }
     html += "</tr>";
@@ -314,6 +320,70 @@ document.getElementById("copiar").onclick = async () => {
     setTimeout(() => btn.textContent = "Copiar mensagem", 2200);
   }
 };
+/* ---------- horários da falta ---------- */
+function descFalta(p) {
+  if (diaTodo(p)) return "";
+  const hs = [...ausentes.get(p)].sort((a, b) => a - b).map(i => (i + 1) + "º");
+  const txt = hs.length === 1 ? hs[0] : hs.slice(0, -1).join(", ") + " e " + hs[hs.length - 1];
+  return " (" + txt + (hs.length === 1 ? " horário" : " horários") + ")";
+}
+
+function definirFalta(p, conjunto) {
+  if (conjunto.size === 0) ausentes.delete(p); else ausentes.set(p, conjunto);
+  escolhas = {}; render();
+}
+
+function painelFaltas() {
+  elFaltas.innerHTML = "";
+  elFaltas.hidden = ausentes.size === 0;
+  if (!ausentes.size) return;
+  const n = T().nHor;
+  const atalhos = [
+    ["Dia todo", () => todos()],
+    ["2 primeiros", () => new Set([0, 1])],
+    ["Último", () => new Set([n - 1])]
+  ];
+  for (const p of ausentes.keys()) {
+    const box = document.createElement("div");
+    box.className = "falta";
+    const nome = document.createElement("div");
+    nome.className = "fnome";
+    nome.textContent = p;
+    const rot = document.createElement("span");
+    rot.textContent = diaTodo(p) ? "falta o dia todo" : "falta só em parte do dia";
+    nome.appendChild(rot);
+
+    const hor = document.createElement("div");
+    hor.className = "row";
+    for (let i = 0; i < n; i++) {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "hbtn";
+      b.setAttribute("aria-pressed", faltaEm(p, i));
+      b.innerHTML = "<b></b><small></small>";
+      b.querySelector("b").textContent = (i + 1) + "º";
+      b.querySelector("small").textContent = T().H[p][dia][i];
+      b.onclick = () => {
+        const c = new Set(ausentes.get(p));
+        c.has(i) ? c.delete(i) : c.add(i);
+        definirFalta(p, c);
+      };
+      hor.appendChild(b);
+    }
+
+    const at = document.createElement("div");
+    at.className = "row atalhos";
+    atalhos.forEach(([txt, f]) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "mini"; b.textContent = txt;
+      b.onclick = () => definirFalta(p, f());
+      at.appendChild(b);
+    });
+
+    box.append(nome, hor, at);
+    elFaltas.appendChild(box);
+  }
+}
+
 document.getElementById("limpar").onclick = () => { ausentes.clear(); escolhas = {}; render(); };
 
 montarChips();
