@@ -13,6 +13,12 @@ Escolha o turno, o dia e marque quem faltou. O aplicativo monta o quadro horári
 - A falta pode ser **só em alguns horários** (ex.: os dois primeiros ou o último). Nesse caso, só esses horários são cobertos, e o professor pode ser usado como substituto nos horários em que está na escola.
 - O mesmo professor nunca é escalado para duas turmas no mesmo horário.
 
+## Quadro publicado para os professores
+
+Ao tocar em **Salvar no histórico**, o quadro do dia também é publicado no servidor da escola (Corretor EMFAL). Na primeira vez, o app pede o usuário e a senha da coordenação no Corretor.
+
+Os professores veem o quadro, sem login, em `?quadro` (ex.: https://emfalped-source.github.io/substituicao-emfal/?quadro). Só o quadro é publicado; o histórico do ponto continua guardado no aparelho da coordenação.
+
 ## Atualizar os horários
 
 Os horários ficam no início do arquivo `app.js`, nas constantes `MANHA` (5 horários por dia) e `TARDE` (4 horários por dia).

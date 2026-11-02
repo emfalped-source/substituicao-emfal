@@ -114,6 +114,17 @@ td.fora{background:var(--alert-soft);color:var(--alert);font-weight:600}
 .regCorpo .row{align-items:center}
 .mini.perigo{color:var(--alert)}
 .mini:disabled{opacity:.4;cursor:default}
+.pubLinha{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;font-size:.84rem;color:var(--muted)}
+.pubLinha .ok{color:var(--accent);font-weight:600}.pubLinha .erro{color:var(--alert);font-weight:600}
+dialog{border:1px solid var(--line);border-radius:12px;padding:18px;max-width:340px;width:92vw;background:var(--surface);color:var(--ink)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog label{display:block;font-size:.8rem;color:var(--muted);margin-top:10px}
+dialog input{width:100%;font-family:var(--body);font-size:.95rem;padding:8px 9px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--ink)}
+.pubData{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.vazioPub{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;color:var(--muted)}
+.carimbo{font-size:.78rem;color:var(--muted);margin:-4px 0 12px}
+body.ver section.coord{display:none!important}
+body:not(.ver) #publico{display:none!important}
 @media (max-width:520px){
   .aula{grid-template-columns:52px 1fr;grid-template-areas:"t q" "s s";row-gap:8px}
   .aula .turma{grid-area:t}.aula .quem{grid-area:q}.aula .escolha{grid-area:s}
@@ -127,7 +138,13 @@ td.fora{background:var(--alert-soft);color:var(--alert);font-weight:600}
     <p>Escola Municipal Francisca Alves</p>
   </header>
 
-  <section>
+  <section id="publico">
+    <h2 id="pubTitulo">Substituições do dia</h2>
+    <div class="pubData" id="pubDatas"></div>
+    <div id="pubSaida"><div class="vazioPub">Carregando o quadro...</div></div>
+    <div class="row" style="margin-top:10px"><button class="btn ghost" id="pubAtualizar" type="button">Atualizar</button></div>
+  </section>
+  <section class="coord">
     <span class="step">Passo 1</span>
     <h2>Turno e dia</h2>
     <div class="row" id="turnos" style="margin-bottom:8px"></div>
@@ -135,7 +152,7 @@ td.fora{background:var(--alert-soft);color:var(--alert);font-weight:600}
     <label class="dataLinha">Data <input type="date" id="dataReg"></label>
   </section>
 
-  <section>
+  <section class="coord">
     <span class="step">Passo 2</span>
     <h2>Professores que faltaram</h2>
     <p class="legenda" style="margin:-4px 0 10px">Toque no nome. Se a falta for só em alguns horários, desmarque os outros logo abaixo.</p>
@@ -143,7 +160,7 @@ td.fora{background:var(--alert-soft);color:var(--alert);font-weight:600}
     <div id="faltas" hidden></div>
   </section>
 
-  <section>
+  <section class="coord">
     <span class="step">Passo 3</span>
     <h2>Substituições do dia</h2>
     <div id="saida"></div>
@@ -154,7 +171,7 @@ td.fora{background:var(--alert-soft);color:var(--alert);font-weight:600}
     </details>
   </section>
 
-  <section id="wppBox" hidden>
+  <section id="wppBox" class="coord" hidden>
     <h2>Mensagem para o grupo</h2>
     <textarea id="wpp" readonly></textarea>
     <div class="row" style="margin-top:10px">
@@ -162,9 +179,11 @@ td.fora{background:var(--alert-soft);color:var(--alert);font-weight:600}
       <button class="btn ghost" id="salvarHist">Salvar no histórico</button>
       <button class="btn ghost" id="limpar">Limpar seleção</button>
     </div>
+    <div class="pubLinha"><span id="pubStatus">Ao salvar no histórico, o quadro também é publicado para os professores.</span>
+      <button class="mini" id="linkProf" type="button">Copiar link dos professores</button></div>
   </section>
 
-  <section id="histBox">
+  <section id="histBox" class="coord">
     <span class="step">Para o ponto</span>
     <h2>Histórico <small id="contPend" class="cont"></small></h2>
     <p class="legenda" style="margin:-4px 0 10px">Cada dia salvo fica aqui até você lançar no ponto do servidor. Os registros ficam guardados neste aparelho.</p>
@@ -176,6 +195,19 @@ td.fora{background:var(--alert-soft);color:var(--alert);font-weight:600}
     <button class="mini" id="exportar" type="button" style="margin-top:6px">Baixar histórico (planilha CSV)</button>
   </section>
 </div>
+<dialog id="dlgLogin">
+  <form method="dialog" id="fLogin">
+    <h2 style="margin:0 0 4px">Publicar o quadro</h2>
+    <p class="legenda" style="margin:0">Entre com o usuário e a senha da coordenação no Corretor EMFAL. Só é pedido uma vez neste aparelho.</p>
+    <label>Usuário<input id="lgUsu" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+    <label>Senha<input id="lgSen" type="password" autocomplete="current-password"></label>
+    <p class="legenda" id="lgErro" style="color:var(--alert)"></p>
+    <div class="row" style="margin-top:12px;justify-content:flex-end">
+      <button class="btn ghost" value="cancelar" type="submit" formnovalidate>Agora não</button>
+      <button class="btn" value="entrar" id="lgOk" type="submit">Entrar e publicar</button>
+    </div>
+  </form>
+</dialog>
 <script src="app.js"></script>
 </body>
 </html>

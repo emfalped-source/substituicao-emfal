@@ -306,6 +306,7 @@ function textoWpp(plano) {
     });
     linhas.push("");
   });
+  linhas.push("Quadro do dia: " + LINK_PROF);
   linhas.push("Qualquer alteração, avisar a coordenação.");
   return linhas.join("\n");
 }
@@ -502,7 +503,7 @@ document.getElementById("salvarHist").onclick = () => {
   abertos.add(idReg(r));
   renderHist();
   aviso(btn, "Salvo no histórico");
-  document.getElementById("histBox").scrollIntoView({ behavior: "smooth", block: "start" });
+  publicar(r);
 };
 
 document.querySelectorAll("#filtroHist button").forEach(b => b.onclick = () => { filtroHist = b.dataset.f; renderHist(); });
@@ -599,10 +600,103 @@ document.getElementById("exportar").onclick = () => {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 };
 
+/* ---------- quadro publicado (servidor da escola, via Corretor EMFAL) ---------- */
+const API_URL = "https://script.google.com/macros/s/AKfycbzCbPfrmF1AZhXP2xh0Se-mMQUJlWqbTkCZ8doxeNOsn5XHBE-2YMW-M6T4_R3BtBrF/exec";
+const LINK_PROF = location.origin + location.pathname.replace(/index\.html$/, "") + "?quadro";
+const MODO_VER = /[?&]quadro\b/.test(location.search);
+const CHAVE_SESS = "subst-emfal-sessao";
+
+function api(fn, ...args) {
+  return fetch(API_URL, { method: "POST", body: JSON.stringify({ fn, args }), headers: { "Content-Type": "text/plain;charset=utf-8" }, credentials: "omit", redirect: "follow" })
+    .catch(() => { throw new Error("Sem conexão com a internet."); })
+    .then(r => { if (!r.ok) throw new Error("O servidor não respondeu (erro " + r.status + ")."); return r.text(); })
+    .then(t => { let j; try { j = JSON.parse(t); } catch (e) { throw new Error("O servidor está ocupado. Tente de novo."); }
+      if (j && j.ok) return j.res; throw new Error(String((j && j.erro) || "Erro desconhecido.").replace(/^Error: /, "")); });
+}
+function lerSess() { try { return JSON.parse(localStorage.getItem(CHAVE_SESS)) || null; } catch (e) { return null; } }
+function gravarSess(v) { try { v ? localStorage.setItem(CHAVE_SESS, JSON.stringify(v)) : localStorage.removeItem(CHAVE_SESS); } catch (e) {} }
+function statusPub(txt, cls) {
+  const el = document.getElementById("pubStatus");
+  el.textContent = txt; el.className = cls || "";
+}
+function pedirLogin() {
+  return new Promise(ok => {
+    const dlg = document.getElementById("dlgLogin");
+    document.getElementById("lgErro").textContent = "";
+    dlg.returnValue = "";
+    dlg.onclose = () => {
+      if (dlg.returnValue !== "entrar") return ok(null);
+      const u = document.getElementById("lgUsu").value.trim(), p = document.getElementById("lgSen").value;
+      document.getElementById("lgSen").value = "";
+      if (!u || !p) return ok(null);
+      statusPub("Entrando...");
+      api("entrar", u, p).then(r => {
+        if (!r || !r.eu) throw new Error("Não foi possível entrar.");
+        if (r.eu.trocarSenha) throw new Error("Troque sua senha provisória no Corretor EMFAL antes de publicar.");
+        if (r.eu.perfil !== "coordenacao") throw new Error("Só o perfil coordenação publica o quadro.");
+        const s = { token: r.token, nome: r.eu.nome };
+        gravarSess(s); ok(s);
+      }).catch(e => { statusPub("Não publicado: " + e.message, "erro"); ok(null); });
+    };
+    dlg.showModal();
+    setTimeout(() => document.getElementById("lgUsu").focus(), 50);
+  });
+}
+async function publicar(r, tentativa) {
+  let s = lerSess();
+  if (!s) { s = await pedirLogin(); if (!s) { if (!/Não publicado/.test(document.getElementById("pubStatus").textContent)) statusPub("Salvo só neste aparelho. Toque em Salvar no histórico de novo para publicar.", "erro"); return; } }
+  statusPub("Publicando para os professores...");
+  try {
+    await api("publicarQuadro", s.token, { data: r.data, turno: r.turno, turnoNome: r.turnoNome, hor: T().hor, ausentes: r.ausentes, subs: r.subs });
+    statusPub("Publicado para os professores às " + new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) + ".", "ok");
+  } catch (e) {
+    if (/SESSAO/.test(e.message) && !tentativa) { gravarSess(null); return publicar(r, true); }
+    statusPub("Não publicado: " + e.message.replace(/^SESSAO: ?/, "") + " O quadro ficou salvo neste aparelho.", "erro");
+  }
+}
+document.getElementById("linkProf").onclick = e => copiarTexto(LINK_PROF, e.target);
+
+/* Tela dos professores: ?quadro */
+let pubData = "";
+function esc(t) { return String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function carregarPublico() {
+  const out = document.getElementById("pubSaida");
+  out.innerHTML = '<div class="vazioPub">Carregando o quadro...</div>';
+  api("quadrosPublicados", pubData).then(r => {
+    pubData = r.data;
+    document.getElementById("pubTitulo").textContent = r.data ? "Substituições de " + nomeDia(r.data).toLowerCase() + ", " + brDe(r.data) : "Substituições do dia";
+    document.getElementById("pubDatas").innerHTML = (r.datas || []).slice(0, 7).map(d =>
+      '<button class="day" type="button" data-d="' + d + '" aria-pressed="' + (d === r.data) + '">' + brDe(d).slice(0, 5) + "</button>").join("");
+    document.querySelectorAll("#pubDatas button").forEach(b => b.onclick = () => { pubData = b.dataset.d; carregarPublico(); });
+    if (!r.quadros.length) { out.innerHTML = '<div class="vazioPub">Nenhum quadro publicado ainda.</div>'; return; }
+    out.innerHTML = r.quadros.map(q => {
+      const porHor = {};
+      q.subs.forEach(s => (porHor[s.hor] = porHor[s.hor] || []).push(s));
+      const hs = Object.keys(porHor).map(Number).sort((a, b) => a - b);
+      return '<h2 style="margin-top:6px">' + esc(q.turnoNome) + "</h2>" +
+        '<p class="carimbo">Ausentes: ' + esc(q.ausentes.map(a => a.nome).join(", ")) + " · publicado às " +
+        new Date(q.publicadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) + "</p>" +
+        (hs.length ? hs.map(h => '<div class="slot"><h3>' + h + "º horário</h3>" + porHor[h].map(s =>
+          '<div class="aula"><div class="turma">' + esc(s.turma) + '</div><div class="quem">no lugar de<b>' + esc(s.ausente) + "</b></div>" +
+          '<div class="quem escolha">substituto<b>' + esc(s.sub) + "</b>" +
+          (s.tipo === "remanejar" ? '<span class="tag rem">Acepat vai para o ' + s.destino + "º horário</span>" : "") + "</div></div>").join("") + "</div>").join("")
+          : '<div class="vazioPub">Sem aulas a cobrir neste turno.</div>');
+    }).join("");
+  }).catch(e => { out.innerHTML = '<div class="vazioPub">' + esc(e.message) + " Toque em Atualizar para tentar de novo.</div>"; });
+}
+function iniciarPublico() {
+  if (!MODO_VER) return;
+  document.body.classList.add("ver");
+  document.querySelector("header.bar p").textContent = "Escola Municipal Francisca Alves · quadro publicado pela coordenação";
+  document.getElementById("pubAtualizar").onclick = carregarPublico;
+  carregarPublico();
+}
+
 renderHist();
 
 montarChips();
 render();
+iniciarPublico();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
