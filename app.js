@@ -634,7 +634,18 @@ function pedirLogin() {
       statusPub("Entrando...");
       api("entrar", u, p).then(r => {
         if (!r || !r.eu) throw new Error("Não foi possível entrar.");
-        if (r.eu.trocarSenha) throw new Error("Troque sua senha provisória no Corretor EMFAL antes de publicar.");
+        if (r.eu.trocarSenha) {
+          if (!window.ContaEMFAL) throw new Error("Troque sua senha provisória antes de publicar (toque em Conta, no topo).");
+          // senha provisória: cria a senha aqui mesmo e entra de novo com a nova
+          return new Promise((fim, erro) => ContaEMFAL.abrir({ usuario: u, senha: p, obrigatoria: true, aoTerminar: res => {
+            if (!res.trocouSenha) return erro(new Error("A senha provisória não foi trocada."));
+            api("entrar", u, res.senha).then(fim, erro);
+          } })).then(r2 => {
+            if (r2.eu.perfil !== "coordenacao") throw new Error("Só o perfil coordenação publica o quadro.");
+            const s2 = { token: r2.token, nome: r2.eu.nome };
+            gravarSess(s2); ok(s2);
+          });
+        }
         if (r.eu.perfil !== "coordenacao") throw new Error("Só o perfil coordenação publica o quadro.");
         const s = { token: r.token, nome: r.eu.nome };
         gravarSess(s); ok(s);
@@ -747,3 +758,9 @@ if (!MODO_VER) carregarHist(false);
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 }
+
+/* ---------- conta (troca de senha e cadastro de professores, igual em todos os apps da EMFAL) ---------- */
+document.getElementById("btConta").onclick = () => {
+  if (window.ContaEMFAL) ContaEMFAL.abrir({});
+  else alert("Não foi possível abrir a conta. Verifique a internet.");
+};
