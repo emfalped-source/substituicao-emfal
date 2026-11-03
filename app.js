@@ -306,7 +306,6 @@ function textoWpp(plano) {
     });
     linhas.push("");
   });
-  linhas.push("Quadro do dia: " + LINK_PROF);
   linhas.push("Qualquer alteração, avisar a coordenação.");
   return linhas.join("\n");
 }
@@ -426,7 +425,7 @@ function montarRegistro() {
     destino: a.tipo === "remanejar" ? a.destino + 1 : null
   })));
   return {
-    data: dataSel, turno, turnoNome: T().nome, nHor: T().nHor, coord: T().coord,
+    data: dataSel, turno, turnoNome: T().nome, nHor: T().nHor, coord: T().coord, hor: T().hor,
     ausentes: [...ausentes].map(([p, hs]) => ({ nome: p, hor: [...hs].sort((a, b) => a - b).map(i => i + 1) })),
     subs, lancado: false, salvoEm: new Date().toISOString()
   };
@@ -449,7 +448,7 @@ function resumoPonto(r) {
   });
   L.push("", "Substituições realizadas:");
   if (!porSub.size) L.push("- nenhuma");
-  [...porSub.keys()].sort((a, b) => a.localeCompare(b, "pt-BR")).forEach(p => {
+  [...porSub.keys()].sort((a, b) => Math.min(...porSub.get(a).map(s => s.hor)) - Math.min(...porSub.get(b).map(s => s.hor)) || a.localeCompare(b, "pt-BR")).forEach(p => {
     const it = porSub.get(p).sort((a, b) => a.hor - b.hor);
     L.push("- " + p + ": " + it.length + (it.length === 1 ? " aula" : " aulas") + " — " +
       it.map(s => s.hor + "º " + s.turma + " (no lugar de " + s.ausente + ")" +
@@ -557,8 +556,10 @@ function renderHist() {
       if (r.lancado) bL.classList.add("ghost");
       bL.onclick = () => {
         const l = lerHist(); const x = l.find(y => idReg(y) === id);
-        if (x) { x.lancado = !x.lancado; x.lancadoEm = x.lancado ? new Date().toISOString() : null; gravarHist(l); }
+        if (!x) return;
+        x.lancado = !x.lancado; x.lancadoEm = x.lancado ? new Date().toISOString() : null; gravarHist(l);
         renderHist();
+        noServidor("marcarLancadoSubst", idReg(x), x.lancado);
       };
       const bC = document.createElement("button");
       bC.type = "button"; bC.className = "btn ghost"; bC.textContent = "Copiar resumo";
@@ -568,13 +569,14 @@ function renderHist() {
       bX.onclick = () => {
         if (!confirm("Excluir o registro de " + brDe(r.data) + " (" + r.turnoNome + ")?")) return;
         gravarHist(lerHist().filter(y => idReg(y) !== id)); abertos.delete(id); renderHist();
+        noServidor("excluirQuadroSubst", id);
       };
       acoes.append(bL, bC, bX);
       corpo.appendChild(acoes);
       if (r.lancado && r.lancadoEm) {
         const p = document.createElement("p");
         p.className = "legenda";
-        p.textContent = "Lançado em " + new Date(r.lancadoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+        p.textContent = "Lançado em " + new Date(r.lancadoEm).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) + (r.lancadoPor ? " por " + r.lancadoPor : "");
         corpo.appendChild(p);
       }
       card.appendChild(corpo);
@@ -636,7 +638,7 @@ function pedirLogin() {
         if (r.eu.perfil !== "coordenacao") throw new Error("Só o perfil coordenação publica o quadro.");
         const s = { token: r.token, nome: r.eu.nome };
         gravarSess(s); ok(s);
-      }).catch(e => { statusPub("Não publicado: " + e.message, "erro"); ok(null); });
+      }).catch(e => { statusPub("Não entrou: " + e.message, "erro"); ok(null); });
     };
     dlg.showModal();
     setTimeout(() => document.getElementById("lgUsu").focus(), 50);
@@ -644,17 +646,17 @@ function pedirLogin() {
 }
 async function publicar(r, tentativa) {
   let s = lerSess();
-  if (!s) { s = await pedirLogin(); if (!s) { if (!/Não publicado/.test(document.getElementById("pubStatus").textContent)) statusPub("Salvo só neste aparelho. Toque em Salvar no histórico de novo para publicar.", "erro"); return; } }
-  statusPub("Publicando para os professores...");
+  if (!s) { s = await pedirLogin(); if (!s) { if (!/Não publicado/.test(document.getElementById("pubStatus").textContent)) statusPub("Salvo só neste aparelho. Toque em Salvar no histórico de novo e entre com seu login para a coordenação ver.", "erro"); return; } }
+  statusPub("Salvando no histórico da coordenação...");
   try {
-    await api("publicarQuadro", s.token, { data: r.data, turno: r.turno, turnoNome: r.turnoNome, hor: T().hor, ausentes: r.ausentes, subs: r.subs });
-    statusPub("Publicado para os professores às " + new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) + ".", "ok");
+    const res = await api("publicarQuadro", s.token, { data: r.data, turno: r.turno, turnoNome: r.turnoNome, hor: r.hor || T().hor, nHor: r.nHor, coord: r.coord, ausentes: r.ausentes, subs: r.subs });
+    statusPub("Salvo no histórico da coordenação às " + new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) + ".", "ok");
+    if (res && res.historico) juntarHist(res.historico);
   } catch (e) {
     if (/SESSAO/.test(e.message) && !tentativa) { gravarSess(null); return publicar(r, true); }
-    statusPub("Não publicado: " + e.message.replace(/^SESSAO: ?/, "") + " O quadro ficou salvo neste aparelho.", "erro");
+    statusPub("Não enviado ao servidor: " + e.message.replace(/^SESSAO: ?/, "") + " O dia ficou salvo neste aparelho. Toque em Salvar no histórico de novo.", "erro");
   }
 }
-document.getElementById("linkProf").onclick = e => copiarTexto(LINK_PROF, e.target);
 
 /* Tela dos professores: ?quadro */
 let pubData = "";
@@ -684,6 +686,49 @@ function carregarPublico() {
     }).join("");
   }).catch(e => { out.innerHTML = '<div class="vazioPub">' + esc(e.message) + " Toque em Atualizar para tentar de novo.</div>"; });
 }
+/* Histórico compartilhado: o servidor é a fonte; dias salvos sem internet ficam marcados para enviar. */
+function deServidor(x) {
+  return { data: x.data, turno: x.turno, turnoNome: x.turnoNome, nHor: x.nHor, coord: x.coord, hor: x.hor, ausentes: x.ausentes, subs: x.subs,
+    lancado: !!x.lancado, lancadoEm: x.lancadoEm || null, lancadoPor: x.lancadoPor || "", salvoEm: x.salvoEm, salvoPor: x.salvoPor || "", noServidor: true };
+}
+function juntarHist(lista) {
+  const srv = lista.map(deServidor), ids = new Set(srv.map(idReg));
+  const soLocal = lerHist().filter(r => !r.noServidor && !ids.has(idReg(r)));
+  gravarHist(srv.concat(soLocal));
+  renderHist();
+  soLocal.forEach(r => publicar(r));   // envia o que foi salvo antes de ter login ou internet
+}
+async function noServidor(fn, ...args) {
+  const s = lerSess();
+  if (!s) return;
+  try { const l = await api(fn, s.token, ...args); if (Array.isArray(l)) juntarHist(l); }
+  catch (e) {
+    if (/SESSAO/.test(e.message)) gravarSess(null);
+    statusHist("Não foi possível atualizar o servidor: " + e.message.replace(/^SESSAO: ?/, ""), true);
+  }
+}
+function statusHist(txt, erro) {
+  const el = document.getElementById("histStatus");
+  el.textContent = txt; el.style.color = erro ? "var(--alert)" : "";
+}
+async function carregarHist(pedir) {
+  let s = lerSess();
+  if (!s && pedir) s = await pedirLogin();
+  const bt = document.getElementById("histEntrar");
+  bt.hidden = !!s;
+  if (!s) { statusHist("Entre com o login da coordenação para ver o histórico de todos os aparelhos."); return; }
+  statusHist("Atualizando o histórico...");
+  try {
+    juntarHist(await api("historicoSubst", s.token));
+    statusHist("Histórico da coordenação atualizado às " + new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) + ".");
+  } catch (e) {
+    if (/SESSAO/.test(e.message)) { gravarSess(null); bt.hidden = false; statusHist("Sua sessão terminou. Toque em Entrar para ver o histórico.", true); return; }
+    statusHist("Sem conexão com o servidor. Mostrando o que está neste aparelho.", true);
+  }
+}
+document.getElementById("histEntrar").onclick = () => carregarHist(true);
+document.getElementById("histAtualizar").onclick = () => carregarHist(false);
+
 function iniciarPublico() {
   if (!MODO_VER) return;
   document.body.classList.add("ver");
@@ -697,6 +742,7 @@ renderHist();
 montarChips();
 render();
 iniciarPublico();
+if (!MODO_VER) carregarHist(false);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));

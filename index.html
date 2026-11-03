@@ -179,14 +179,16 @@ body:not(.ver) #publico{display:none!important}
       <button class="btn ghost" id="salvarHist">Salvar no histórico</button>
       <button class="btn ghost" id="limpar">Limpar seleção</button>
     </div>
-    <div class="pubLinha"><span id="pubStatus">Ao salvar no histórico, o quadro também é publicado para os professores.</span>
-      <button class="mini" id="linkProf" type="button">Copiar link dos professores</button></div>
+    <div class="pubLinha"><span id="pubStatus">Ao salvar no histórico, o dia fica disponível para toda a coordenação.</span></div>
   </section>
 
   <section id="histBox" class="coord">
     <span class="step">Para o ponto</span>
     <h2>Histórico <small id="contPend" class="cont"></small></h2>
-    <p class="legenda" style="margin:-4px 0 10px">Cada dia salvo fica aqui até você lançar no ponto do servidor. Os registros ficam guardados neste aparelho.</p>
+    <p class="legenda" style="margin:-4px 0 10px">Cada dia salvo fica aqui até ser lançado no ponto do servidor. O histórico fica no servidor da escola e aparece para toda a coordenação, em qualquer aparelho.</p>
+    <div class="pubLinha" style="margin:-4px 0 10px"><span id="histStatus"></span>
+      <button class="mini" id="histEntrar" type="button" hidden>Entrar (coordenação)</button>
+      <button class="mini" id="histAtualizar" type="button">Atualizar</button></div>
     <div class="row" id="filtroHist" style="margin-bottom:10px">
       <button class="day" type="button" data-f="pend">Pendentes</button>
       <button class="day" type="button" data-f="todos">Todos</button>
@@ -197,14 +199,14 @@ body:not(.ver) #publico{display:none!important}
 </div>
 <dialog id="dlgLogin">
   <form method="dialog" id="fLogin">
-    <h2 style="margin:0 0 4px">Publicar o quadro</h2>
-    <p class="legenda" style="margin:0">Entre com o usuário e a senha da coordenação no Corretor EMFAL. Só é pedido uma vez neste aparelho.</p>
+    <h2 style="margin:0 0 4px">Entrar como coordenação</h2>
+    <p class="legenda" style="margin:0">Entre com o usuário e a senha da coordenação no Corretor EMFAL. Assim o histórico fica salvo para toda a coordenação. Só é pedido uma vez neste aparelho.</p>
     <label>Usuário<input id="lgUsu" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
     <label>Senha<input id="lgSen" type="password" autocomplete="current-password"></label>
     <p class="legenda" id="lgErro" style="color:var(--alert)"></p>
     <div class="row" style="margin-top:12px;justify-content:flex-end">
       <button class="btn ghost" value="cancelar" type="submit" formnovalidate>Agora não</button>
-      <button class="btn" value="entrar" id="lgOk" type="submit">Entrar e publicar</button>
+      <button class="btn" value="entrar" id="lgOk" type="submit">Entrar</button>
     </div>
   </form>
 </dialog>
