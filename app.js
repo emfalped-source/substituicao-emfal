@@ -42,7 +42,8 @@ const TARDE = {
 "KELLY A.":"5ºC 5ºA 5ºC Red|5ºC 5ºC 5ºB Red|5ºB 5ºC 5ºA 5ºA|5ºA 5ºB 5ºB Red|Acepat Acepat Acepat Acepat",
 "CLAUDIA":"Acepat Acepat Acepat Acepat|4ºC 4ºC 5ºC 5ºC|5ºC Acepat 4ºC 4ºC|4ºC subst 5ºC 5ºC|4ºC 4ºC 5ºC 5ºC",
 "FÁBIO":"4ºC 4ºC Acepat 5ºC|Acepat Acepat Acepat Acepat|4ºC 4ºC 5ºC 5ºC|5ºC 5ºC subst 4ºC|5ºC 5ºC 4ºC 4ºC",
-"LUDMILA":"subst 5ºC 4ºC 4ºB|2ºA 3ºA 4ºA 2ºB|Acepat 5ºB 1ºA 3ºB|subst subst 1ºB 5ºA|Acepat Acepat Acepat Acepat"
+"LUDMILA":"subst 5ºC 4ºC 4ºB|2ºA 3ºA 4ºA 2ºB|Acepat 5ºB 1ºA 3ºB|subst subst 1ºB 5ºA|Acepat Acepat Acepat Acepat",
+"FLÁVIA":"subst subst subst subst|subst subst subst subst|subst subst subst subst|subst subst subst subst|Acepat Acepat Acepat Acepat"
 };
 
 const TURNOS = {
